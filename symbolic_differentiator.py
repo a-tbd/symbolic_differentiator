@@ -2,8 +2,8 @@
 Symbolic differentiator for single variable polynomial expressions.
 
 Input: Expression (without spaces) to be evaluated and the variable.
-       Constants and exponents must be ints or floats
-       (no fractions or constants).  Exponents must be >= 0.
+       Coefficients and exponents must be ints or floats.  
+       Exponents must be >= 0.
 Output: Nested list containing elements of the derivative of the expression.
 
 Examples:
@@ -46,7 +46,7 @@ class Expression(object):
     def __init__(self, exp):
         self.exp = exp
         self.operator = ''
-        self.constant = ''
+        self.coeff = ''
         self.index_var = None
         self.exponent = ''
         self.dydx = ''
@@ -54,7 +54,7 @@ class Expression(object):
     def split_expression(self, var):
         self.set_index_var(var)
         self.set_operator()
-        self.set_constant()
+        self.set_coefficient()
         self.set_exponent()
 
     def set_index_var(self, var):
@@ -65,16 +65,16 @@ class Expression(object):
         if self.exp[0] in ['+', '-']:
             self.operator = self.exp[0]
 
-    def set_constant(self):
+    def set_coefficient(self):
         start = 0
         end = -1
         if self.operator:
             start = 1
         if not self.index_var is None:
             end = self.index_var
-        self.constant = self.exp[start:end]
-        if self.constant == '':
-            self.constant = 1
+        self.coeff = self.exp[start:end]
+        if self.coeff == '':
+            self.coeff = 1
 
     def set_exponent(self):
         if not self.index_var is None:
@@ -88,8 +88,8 @@ class Expression(object):
             self.dydx = ''
         else:
             new_exponent = self.eval_exponent()
-            new_constant = self.eval_constant()
-            self.dydx = self.format(new_constant, new_exponent, var)
+            new_coeff = self.eval_coefficient()
+            self.dydx = self.format(new_coeff, new_exponent, var)
         return self.dydx
 
     def eval_exponent(self):
@@ -103,12 +103,12 @@ class Expression(object):
         else:
             return new_e
 
-    def eval_constant(self):
+    def eval_coefficient(self):
         try:
-            num_c = float(self.constant)
+            num_c = float(self.coeff)
             num_e = float(self.exponent)
         except ValueError:
-            print 'Constants and exponents must be positive integers or floats.'
+            print 'Coefficients and exponents must be positive integers or floats.'
             sys.exit(2)
         new_c = num_c * num_e
         if new_c.is_integer():
@@ -116,14 +116,14 @@ class Expression(object):
         else:
             return new_c
 
-    def format(self, constant, exponent, var):
+    def format(self, coeff, exponent, var):
         right = self.format_right(exponent, var)
-        if constant == 0:
+        if coeff == 0:
             return ''
         elif right == 1:
-            return self.operator + str(constant * right) 
+            return self.operator + str(coeff * right) 
         else:
-            return self.operator + str(constant) + str(right)
+            return self.operator + str(coeff) + str(right)
 
     def format_right(self, exponent, var):
         if exponent == 0:
