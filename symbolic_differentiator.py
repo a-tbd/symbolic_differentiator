@@ -1,16 +1,17 @@
 '''
-Symbolic differentiator for single variable polynomial expressions.
-
-Input: Expression (without spaces) to be evaluated and the variable.
-       Coefficients and exponents must be ints or floats.  
-       Exponents must be >= 0.
-Output: Nested list containing elements of the derivative of the expression.
+Symbolic differentiation calculator
+Input: Expression to be evaluated and the variable.
+       Coefficients must be ints or floats (no constants or fractions).  
+Output: Derivative of the expression with respect to the input variable.
 
 Examples:
-x^2+3 x ==> 2x
+x^2 + 3x ==> 2x+3
 
-z^4+2z^5-3.5z^1+82 z ==> 4x^3+10x^4-3.5
+z^4+.5z^2-6 ==> 4z^3+1z
 '''
+
+#expression = 'x^2 * 2x+3-8x^(1/2)'
+#print list(expression)
 import sys
 import pdb
 
@@ -40,6 +41,41 @@ class Tokenizer(StateMachine):
             return state, ''
         else:
             return inp, self.state
+
+
+class Calculator(object):
+    def __init__(self):
+        self.tk = Tokenizer(['+','-'])
+        self.polynomial = {}
+
+    def start(self):
+        while True:
+            exp = self.prompt_expression()
+            if not self.is_exit(exp):
+            	var = self.prompt_variable()
+                tokens = [Expression(t) for t in self.tk.transduce(exp) if t != '']
+                derivative = {exp.exponent: exp.eval_derivative(var) for exp in tokens}
+                sorted_exponents = [derivative[k] for k in sorted(derivative.iterkeys())]
+                self.display_derivative(sorted_exponents, var)
+            else:
+                sys.exit()
+
+    def prompt_expression(self):
+        print 'Enter your expression:'
+        exp = raw_input('-->')
+        return exp
+
+    def prompt_variable(self):
+        print 'With respect to what variable?'
+        var = raw_input('-->')
+        return var
+    
+    def display_derivative(self, d, var):
+        func = 'f\'(%s) = ' % var
+        print func + ''.join(d)
+    
+    def is_exit(self, exp):
+        return exp == 'exit' or exp == 'e'
 
 
 class Expression(object):
@@ -94,22 +130,19 @@ class Expression(object):
 
     def eval_exponent(self):
         try:
-            new_e = float(self.exponent) - 1
+            new_e = int(self.exponent) - 1
         except ValueError:
-            print 'Exponents must be positive integers or floats'
-            sys.exit(2)
-        if new_e.is_integer():
-            return int(new_e)
-        else:
-            return new_e
+            print 'ValueError: Exponents must be positive integers.'
+            main()
+        return new_e
 
     def eval_coefficient(self):
         try:
             num_c = float(self.coeff)
-            num_e = float(self.exponent)
+            num_e = int(self.exponent)
         except ValueError:
-            print 'Coefficients and exponents must be positive integers or floats.'
-            sys.exit(2)
+            print 'ValueError: Coefficients must be integers or floats.'
+            main()
         new_c = num_c * num_e
         if new_c.is_integer():
             return int(new_c)
@@ -133,23 +166,9 @@ class Expression(object):
         else:
             return var + '^' + str(exponent)
 
-
-def get_derivative(exp, var):
-    tk = Tokenizer(['+', '-'])
-    tokens = [Expression(t) for t in tk.transduce(exp) if t != '']
-    derivative = [exp.eval_derivative(var) for exp in tokens]
-    return ''.join(derivative)
-
-
-def main(argv):
-    try:
-        exp, var = argv
-    except ValueError:
-        print 'useage: symbolic_differentiator.py x^2+3x+5 x'
-        sys.exit(2)
-    d = get_derivative(exp, var)
-    print d    
-
+def main():
+    calculator = Calculator()
+    calculator.start()
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()
