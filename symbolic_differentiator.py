@@ -10,8 +10,6 @@ x^2 + 3x ==> 2x+3
 z^4+.5z^2-6 ==> 4z^3+1z
 '''
 
-#expression = 'x^2 * 2x+3-8x^(1/2)'
-#print list(expression)
 import sys
 import pdb
 
