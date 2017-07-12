@@ -7,59 +7,38 @@ Output: Derivative of the expression with respect to the input variable.
 Examples:
 x^2 + 3x ==> 2x+3
 
-z^4+.5z^2-6 ==> 4z^3+1z
+z^4+.5z^2-6 ==> 4z^3+z
 '''
-
-import sys
+import collections
+import re
 import pdb
-
-class StateMachine(object):
-    def transduce(self, inputs):
-        inputs += ' '
-        self.exp = inputs
-        return [self.step(i, c) for i, c in enumerate(inputs)]
-
-    def step(self, index, inp):
-        (s, o) = self.next_step(self.state, index, inp)
-        self.state = s
-        return o
-
-
-class Tokenizer(StateMachine):
-    def __init__(self, delim):
-        self.state = ''
-        self.delim = delim
-        self.exp = None
-
-    def next_step(self, state, index, inp):
-        if index == (len(self.exp) - 1):
-            return '', self.state
-        elif not inp in self.delim:
-            state += inp
-            return state, ''
-        else:
-            return inp, self.state
 
 
 class Calculator(object):
     def __init__(self):
-        self.tk = Tokenizer(['+','-'])
-        self.polynomial = {}
+        self.loop = True
+        self.components = []
 
     def start(self):
-        while True:
+        """Prompts user for expression and variable.
+           Returns the derivative as a string.
+           Continues looping until user exits."""
+        while self.loop:
             exp = self.prompt_expression()
             if not self.is_exit(exp):
-            	var = self.prompt_variable()
-                tokens = [Expression(t) for t in self.tk.transduce(exp) if t != '']
-                derivative = {exp.exponent: exp.eval_derivative(var) for exp in tokens}
-                sorted_exponents = [derivative[k] for k in sorted(derivative.iterkeys())]
-                self.display_derivative(sorted_exponents, var)
+                var = self.prompt_variable()
+                try:
+                    self.components = self.parse_expression(exp, var)
+                    dydx = [c.evaluate_derivative() for c in self.components]
+                    self.display_derivative(dydx, var)
+                except ValueError:
+                    raise
             else:
-                sys.exit()
+                self.loop = False
+            self.components = [] # is this enough to deal with stack overflow issues?
 
     def prompt_expression(self):
-        print 'Enter your expression:'
+        print 'Enter your expression or e to exit:'
         exp = raw_input('-->')
         return exp
 
@@ -74,99 +53,114 @@ class Calculator(object):
     
     def is_exit(self, exp):
         return exp == 'exit' or exp == 'e'
+    
+    def parse_expression(self, exp, var):
+        """Takes string expression, returns list of expressions. 
+           Currently only supports single var poly"""
+        exp = ''.join(exp.split())
+        poly_regex = re.compile('[+-]?[a-z0-9^**.]*')
+        poly_parse = poly_regex.findall(exp) 
+        return [SingleVarPoly(poly_parse, var)] # this will continue to fill the stack with objects :/
 
 
 class Expression(object):
-    def __init__(self, exp):
-        self.exp = exp
-        self.operator = ''
-        self.coeff = ''
-        self.index_var = None
-        self.exponent = ''
-        self.dydx = ''
+    def __init__(self, exp, var):
+        self.exp = exp 
+        self.var = var
+        self.dydx = None
 
-    def split_expression(self, var):
-        self.set_index_var(var)
-        self.set_operator()
-        self.set_coefficient()
-        self.set_exponent()
 
-    def set_index_var(self, var):
-        if var in self.exp:
-            self.index_var = self.exp.index(var)
-
-    def set_operator(self):
-        if self.exp[0] in ['+', '-']:
-            self.operator = self.exp[0]
-
-    def set_coefficient(self):
-        start = 0
-        end = -1
-        if self.operator:
-            start = 1
-        if not self.index_var is None:
-            end = self.index_var
-        self.coeff = self.exp[start:end]
-        if self.coeff == '':
-            self.coeff = 1
-
-    def set_exponent(self):
-        if not self.index_var is None:
-            self.exponent = self.exp[self.index_var + 2:]
-            if self.exponent == '':
-                self.exponent = 1
-
-    def eval_derivative(self, var):
-        self.split_expression(var)
-        if self.index_var is None:
-            self.dydx = ''
+class SingleVarPoly(Expression):
+    def __init__(self, exp, var):
+        Expression.__init__(self, exp, var)
+    
+    def evaluate_derivative(self):
+        """Takes a single var polynomial as a string.
+           Returns the derivative as a string."""
+        terms = collections.defaultdict(list)
+        for t in self.exp:
+            if t:
+                e, c = self.derivative_by_term(t)
+                terms[e].append(c)
+        # Combine like terms and sort in decreasing exponent order
+        for e in terms:
+            if len(terms[e]) > 1:
+                terms[e] = [sum(terms[e])]
+        dydx = self.format(terms)
+        return ''.join(dydx)
+  
+    def derivative_by_term(self, term):
+        """Takes term of polynomial as a string.
+           Returns the derivative as a tuple (exp, coeff)."""
+        if not self.var in term:
+            return -1, 0 # constant term
         else:
-            new_exponent = self.eval_exponent()
-            new_coeff = self.eval_coefficient()
-            self.dydx = self.format(new_coeff, new_exponent, var)
-        return self.dydx
+            index_var = term.index(self.var)
+            coeff = term[:index_var]
+            exponent = term[index_var+1:]
 
-    def eval_exponent(self):
+            if '^' in exponent:
+                exponent = exponent[1:]
+            elif '**' in exponent:
+                exponent = exponent[2:]
+            
+            if exponent == '':
+                exponent = 1
+            if coeff == '' or coeff == '+':
+                coeff = 1
+            elif coeff == '-':
+                coeff = -1
+            new_exponent = self.eval_exponent(exponent)
+            new_coeff = self.eval_coefficient(coeff, exponent)
+            return new_exponent, new_coeff
+
+    def eval_exponent(self, exponent):
         try:
-            new_e = int(self.exponent) - 1
+            new_e = int(exponent) - 1
+            return new_e
         except ValueError:
-            print 'ValueError: Exponents must be positive integers.'
-            main()
-        return new_e
+            raise ValueError('Exponents must be positive integers.')
 
-    def eval_coefficient(self):
+    def eval_coefficient(self, coeff, exponent):
         try:
-            num_c = float(self.coeff)
-            num_e = int(self.exponent)
+            num_c = float(coeff)
+            num_e = int(exponent)
+            new_c = num_c * num_e
+            if new_c.is_integer():
+                return int(new_c)
+            else:
+                return new_c
         except ValueError:
-            print 'ValueError: Coefficients must be integers or floats.'
-            main()
-        new_c = num_c * num_e
-        if new_c.is_integer():
-            return int(new_c)
-        else:
-            return new_c
+            raise ValueError('Coefficients must be integers or floats.')
 
-    def format(self, coeff, exponent, var):
-        right = self.format_right(exponent, var)
-        if coeff == 0:
-            return ''
-        elif right == 1:
-            return self.operator + str(coeff * right) 
-        else:
-            return self.operator + str(coeff) + str(right)
+    def format(self, terms):
+        """Takes dict of terms represented as {exponent: [coefficient]}
+           Returns derivative as a string."""
+        dydx = []
+        keys = sorted([k for k in terms],reverse=True)
+        for e in keys:
+            exponent = e
+            coeff = terms[e][0]
+            op = ''
+            if e != keys[0] and coeff > -1:
+                op = '+'
+            if coeff == 0 or exponent == -1:
+                dydx.append('')
+            elif exponent == 0:
+                dydx.append(op + str(coeff))
+            elif exponent == 1:
+                if coeff == 1:
+                    coeff = ''
+                dydx.append(op + str(coeff) + self.var)
+            else:
+                dydx.append(op + str(coeff) + self.var + '^' + str(exponent))
+        return dydx
 
-    def format_right(self, exponent, var):
-        if exponent == 0:
-            return 1
-        elif exponent == 1:
-            return var
-        else:
-            return var + '^' + str(exponent)
 
 def main():
     calculator = Calculator()
     calculator.start()
+
 
 if __name__ == '__main__':
     main()
