@@ -6,12 +6,38 @@ Output: Derivative of the expression with respect to the input variable.
 
 Examples:
 x^2 + 3x ==> 2x+3
-
 z^4+.5z^2-6 ==> 4z^3+z
+sin(x+2)-2x ==> cos(x)+2
+sin(x)/3
+2 ((sinxcosx)+(1-x)^(1/2)) / (5-x)
+- if a parentheses is found, backtrack and see if it's preceeded by sin, cos, or tan.  If so, add sin/cos/tan( to the token
+    continue until a closing parentheses.  if another open parentheses is found, continue until two closing parentheses
 '''
 import collections
 import re
 import pdb
+
+
+class Parser(object):
+    def __init__(self, exp):
+        self.exp = exp
+
+    def parse(self):
+        # TO DO: add in parentheses
+        tokens = []
+        token = ''
+        for i in range(len(self.exp)):
+            if self.exp[i] == '-':
+                tokens.append(token)
+                token = self.exp[i] # '-'
+            elif self.exp[i] == '+':
+                tokens.append(token)
+                token = ''
+            else:
+                token += self.exp[i]
+        tokens.append(token)
+        return tokens
+
 
 
 class Calculator(object):
@@ -29,9 +55,9 @@ class Calculator(object):
                 var = self.prompt_variable()
                 try:
                     self.components = self.parse_expression(exp, var)
-                    dydx = [c.evaluate_derivative() for c in self.components]
+                    dydx = [c.evaluate_derivative() for c in self.components] # TO DO: fix this for chain rule
                     self.display_derivative(dydx, var)
-                except ValueError:
+                except ValueError: # TO DO: continue program?
                     raise
             else:
                 self.loop = False
@@ -56,9 +82,13 @@ class Calculator(object):
     
     def parse_expression(self, exp, var):
         """Takes string expression, returns list of expressions. 
-           Currently only supports single var poly"""
+           Currently only supports single var poly."""
         exp = ''.join(exp.split())
-        poly_regex = re.compile('[+-]?[a-z0-9^**.]*')
+        poly_regex = re.compile('[+-]?[a-z0-9^**.]*') # TO DO: this will capture * too...
+        trig_regex = re.compile('([+-]?)(cos\(|sin\(|tan\()([^)]*)(\))') # TO DO
+        # parser to look at each expression individually
+        # first tokenize into pieces and then parse each expression
+        # ideal structure is a tree
         poly_parse = poly_regex.findall(exp) 
         return [SingleVarPoly(poly_parse, var)] # this will continue to fill the stack with objects :/
 
@@ -98,7 +128,7 @@ class SingleVarPoly(Expression):
             index_var = term.index(self.var)
             coeff = term[:index_var]
             exponent = term[index_var+1:]
-
+            
             if '^' in exponent:
                 exponent = exponent[1:]
             elif '**' in exponent:
@@ -156,6 +186,20 @@ class SingleVarPoly(Expression):
                 dydx.append(op + str(coeff) + self.var + '^' + str(exponent))
         return dydx
 
+class Trigonometric(Expression):
+    def __init__(self, exp, var):
+        Expression.__init__(self, exp, var)
+
+    def evaluate_derivative(self):
+        """Takes a trigonometric function as a string and 
+           returns it's derivative as a string."""
+        trig_funcs = {'sin': 'cos',
+                      'cos': '-sin',
+                      'tan': 'sec^2',
+                      '-sin': '-cos',
+                      '-cos': 'sin',
+                      }   
+        # TO DO
 
 def main():
     calculator = Calculator()
